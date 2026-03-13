@@ -1,41 +1,69 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Тестовое задание: API Парсер (Wildberries)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Приложение для автоматического сбора данных (Stocks, Sales, Orders, Incomes) из внешнего API с поддержкой множества компаний и аккаунтов.
 
-## About Laravel Project
+## Особенности реализации (Выполненные требования)
+**Docker-контейнеризация:** Приложение развернуто с помощью docker-compose (2 сервиса: PHP и MySQL).
+**Нестандартный порт БД:** MySQL доступен снаружи по порту 3333 (внутри сети стандартный 3306).
+**Мультитенантность:** Реализована реляционная структура: Компании -> Аккаунты -> Токены -> API Сервисы. Данные разных аккаунтов изолированы полем account_id в таблицах данных.
+**Умная загрузка:** Скрипты автоматически определяют дату последней записи в БД для конкретного аккаунта и скачивают только свежие данные, избегая дублирования.
+**Отказоустойчивость (Обработка 429):** Реализован ApiRequestTrait. При получении ошибки "429 Too Many Requests", парсер засыпает на 60 секунд и повторяет попытку (до 3 раз).
+**Консольный интерфейс:** Вывод детальной отладочной информации ($this->info()) и интерактивная команда для настройки системы.
+**Автоматизация:** Настроено расписание в "routes/console.php" для обновления данных 2 раза в день.
 
-Извиняюсь что так тянул, только 25.02 сутра до компьютера добрался
 
-С бесплатными хостами проблема, основные db4free.net и remotemysql.com не работают, видимо 500 ошибка, даже с VPN не пускают.
-infinityfree.com не даёт доступа к ip хоста бд
+## 🛠 Установка и запуск
 
-Проект для получения данных по API.
-Установка чистого Laravel (composer create-project laravel/laravel wb-api-test).
+### 1. Подготовка окружения
+**Клонируйте репозиторий и создайте файл настроек:**
 
-Доступы к БД в файле .env:
+cp .env.example .env
+
+**Убедитесь, что в .env указаны настройки для Docker (они стоят по умолчанию):**
+
+```
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=mysql-db
 DB_PORT=3306
 DB_DATABASE=wb_database
-DB_USERNAME=root
-DB_PASSWORD=
+DB_USERNAME=wb_user
+DB_PASSWORD=secretpassword
+```
 
-Таблицы: stocks, sales, orders, incomes.
 
-Чтобы запустить парсинг, используйте команды, при запуске osPanel или xampp или wamp: 
-php artisan migrate
-php artisan fetch:stocks
-php artisan fetch:incomes
-php artisan fetch:orders
-php artisan fetch:sales
-И всё отлично подгрузится
+### 2. Запуск контейнеров
+**Поднимите проект с помощью Docker Compose:**
 
-Рукописные файлы:
-\database\migrations\...
-\app\Models\...     //параметр protected $guarded =[];
-\app\Console\Commands\...
+```
+docker-compose up -d --build
+```
+База данных будет доступна на вашем хосте по порту 3333.
+
+**Установите зависимости PHP (если папка vendor пуста):**
+
+```
+docker exec -it wb_parser_php composer install
+```
+### 3. Миграции базы данных
+**Создайте структуру таблиц:**
+```docker exec -it wb_parser_php php artisan migrate```
+
+## Использование
+**Настройка базовых сущностей (Компании, Аккаунты, Токены)**
+Для начала работы необходимо добавить аккаунт и привязать к нему токен. Запустите интерактивную команду:
+```docker exec -it wb_parser_php php artisan system:setup```
+
+### Ручной запуск парсинга
+Вы можете вручную запустить сбор данных для всех настроенных аккаунтов:
+```
+docker exec -it wb_parser_php php artisan fetch:stocks
+docker exec -it wb_parser_php php artisan fetch:sales
+docker exec -it wb_parser_php php artisan fetch:orders
+docker exec -it wb_parser_php php artisan fetch:incomes
+```
+
+## Автоматизация (Расписание)
+
+В проекте настроено ежедневное обновление данных 2 раза в день (в 00:00 и 12:00) через Laravel Scheduler.
+Для запуска воркера расписания в фоновом режиме выполните команду:
+```docker exec -d wb_parser_php php artisan schedule:work```

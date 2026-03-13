@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  php-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wb_parser_php
+    volumes:
+      - .:/var/www/html # синхронизируем код
+    depends_on:
+      - mysql-db
+    networks:
+      - wb-network
+
+  mysql-db:
+    image: mysql:8.0
+    container_name: wb_parser_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wb_database
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: wb_user
+      MYSQL_PASSWORD: root
+    ports:
+      - "3333:3306"
+    networks:
+      - wb-network
+
+networks:
+  wb-network:
+    driver: bridge
